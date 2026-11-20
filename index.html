@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>중1 과학: 샤를 법칙 시뮬레이터</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans KR & Pretendard 스타일 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons (아이콘용) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8;
+            color: #1e293b;
+        }
+        /* 커스텀 슬라이더 스타일 */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 10px;
+            cursor: pointer;
+            background: linear-gradient(90deg, #3b82f6 0%, #94a3b8 35%, #ef4444 100%);
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid #2563eb;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- 상단 헤더 & 학습 목표 안내 -->
+    <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-white/20 text-xs font-bold px-2.5 py-1 rounded-full tracking-wide">중학교 1학년 과학 · 기체의 성질</span>
+                    <span class="bg-amber-400 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">일정한 압력 조건</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-black mt-1 tracking-tight flex items-center gap-2">
+                    <i data-lucide="flame" class="w-7 h-7 text-amber-300"></i>
+                    샤를 법칙(Charles's Law) 시뮬레이터
+                </h1>
+            </div>
+            <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-sm max-w-xl border border-white/20">
+                <p class="font-bold text-amber-200 flex items-center gap-1.5 mb-0.5">
+                    <i data-lucide="target" class="w-4 h-4"></i> 오늘의 학습 목표
+                </p>
+                <p class="text-white/95 leading-snug">
+                    압력이 일정할 때 <strong>기체의 온도</strong>가 변함에 따라 <strong>기체의 부피</strong>가 어떻게 변하는지 입자의 운동과 그래프로 탐구해 봅시다.
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 대시보드 영역 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+
+        <!-- 상단 실시간 데이터 요약 카드 4종 -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <!-- 현재 온도 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                <div>
+                    <p class="text-xs sm:text-sm font-medium text-slate-500">현재 기체 온도 ($t$)</p>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <span id="stat-temp-c" class="text-2xl sm:text-3xl font-black text-blue-600">0 °C</span>
+                        <span id="stat-temp-k" class="text-xs font-semibold text-slate-400">(273 K)</span>
+                    </div>
+                </div>
+                <div id="temp-icon-bg" class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center transition-colors">
+                    <i data-lucide="thermometer" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- 현재 부피 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                <div>
+                    <p class="text-xs sm:text-sm font-medium text-slate-500">현재 기체 부피 ($V$)</p>
+                    <div class="flex items-baseline gap-1.5 mt-1">
+                        <span id="stat-volume" class="text-2xl sm:text-3xl font-black text-emerald-600">273.0</span>
+                        <span class="text-sm font-bold text-slate-500">mL</span>
+                    </div>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <i data-lucide="box" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- 입자 운동 상태 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                <div>
+                    <p class="text-xs sm:text-sm font-medium text-slate-500">입자 평균 운동 속도</p>
+                    <div class="mt-1">
+                        <span id="stat-speed-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm sm:text-base font-bold bg-slate-100 text-slate-700">
+                            보통 (기준)
+                        </span>
+                    </div>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <i data-lucide="activity" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- 고정 조건 (압력 & 입자 수) -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                <div>
+                    <p class="text-xs sm:text-sm font-medium text-slate-500">통제 변인 (일정하게 유지)</p>
+                    <div class="mt-1 space-y-0.5">
+                        <p class="text-xs sm:text-sm font-bold text-slate-700">• 외부 압력: <span class="text-indigo-600">1 기압 (일정)</span></p>
+                        <p class="text-xs sm:text-sm font-bold text-slate-700">• 기체 입자 수: <span class="text-indigo-600">28 개 (고정)</span></p>
+                    </div>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- 중앙 시뮬레이션 & 실시간 그래프 영역 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 좌측: 실린더 입자 시뮬레이션 Canvas (5칸) -->
+            <div class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        실린더 내부 입자 모형 실험
+                    </h2>
+                    <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        피스톤 자유 이동
+                    </span>
+                </div>
+                
+                <!-- 시뮬레이션 캔버스 래퍼 -->
+                <div class="canvas-container bg-slate-50 rounded-xl border border-slate-200 overflow-hidden" style="min-height: 410px;">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+
+                <!-- 입자 충돌 상태 실시간 안내 문구 -->
+                <div id="sim-caption" class="mt-3 p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    현재 <strong>0°C</strong>입니다. 기체 입자들이 일정한 속도로 움직이며 피스톤을 받치고 있습니다. 온도를 높이거나 낮춰보세요!
+                </div>
+            </div>
+
+            <!-- 우측: 컨트롤 패널 + 실시간 온도-부피 그래프 (7칸) -->
+            <div class="lg:col-span-7 flex flex-col gap-6">
+                
+                <!-- 컨트롤 패널 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+                            실험 조건 조작 패널
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <button id="btn-play-pause" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                                <i data-lucide="pause" class="w-4 h-4"></i>
+                                <span>일시정지</span>
+                            </button>
+                            <button id="btn-reset" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                <span>초기화 (0°C)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 온도 조절 슬라이더 & 버튼 -->
+                    <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/70">
+                        <div class="flex items-center justify-between">
+                            <label for="temp-slider" class="text-sm font-bold text-slate-700">
+                                온도 조절 (-50°C ~ 150°C)
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <button id="btn-temp-down" class="px-2.5 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold text-xs transition active:scale-95">
+                                    -10°C 냉각
+                                </button>
+                                <button id="btn-temp-up" class="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-800 font-bold text-xs transition active:scale-95">
+                                    +10°C 가열
+                                </button>
+                            </div>
+                        </div>
+
+                        <input type="range" id="temp-slider" min="-50" max="150" value="0" step="1" class="w-full">
+                        
+                        <div class="flex justify-between text-xs font-semibold text-slate-400 px-1">
+                            <span>-50°C (냉각)</span>
+                            <span class="text-slate-600">0°C (기준)</span>
+                            <span>50°C</span>
+                            <span>100°C</span>
+                            <span>150°C (가열)</span>
+                        </div>
+                    </div>
+
+                    <!-- 초기 부피(V0) 선택 & 공식 계산 표시 -->
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5">
+                                0°C일 때 초기 부피 ($V_0$) 선택
+                            </label>
+                            <div class="grid grid-cols-3 gap-2" id="v0-selector">
+                                <button data-v0="136.5" class="v0-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition">
+                                    136.5 mL
+                                </button>
+                                <button data-v0="273" class="v0-btn py-2 px-2 rounded-xl text-xs font-bold border-2 border-indigo-600 bg-indigo-50 text-indigo-700 transition">
+                                    273 mL (추천)
+                                </button>
+                                <button data-v0="546" class="v0-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition">
+                                    546 mL
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 실시간 샤를 법칙 공식 대입 박스 -->
+                        <div class="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3">
+                            <p class="text-[11px] font-bold text-amber-800 mb-1">실시간 부피 계산식 ($V = V_0 + V_0 \times \frac{t}{273}$)</p>
+                            <p id="formula-display" class="text-xs sm:text-sm font-bold text-slate-800 font-mono">
+                                V = 273 + 273 × (0 / 273) = <span class="text-emerald-700">273.0 mL</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 실시간 온도-부피 그래프 영역 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex-grow flex flex-col">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div>
+                            <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="trending-up" class="w-5 h-5 text-emerald-600"></i>
+                                온도에 따른 기체의 부피 변화 그래프
+                            </h2>
+                            <p class="text-xs text-slate-500">기체의 온도가 높아질수록 부피가 일정하게 증가하는 비례 직선이 나타납니다.</p>
+                        </div>
+
+                        <!-- 절대 영도(-273°C) 외삽 토글 버튼 -->
+                        <button id="btn-toggle-extrapolate" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition shadow-sm">
+                            <i data-lucide="eye" class="w-4 h-4 text-rose-500"></i>
+                            <span>-273°C (절대영도) 점선 보기</span>
+                        </button>
+                    </div>
+
+                    <div class="canvas-container bg-slate-50 rounded-xl border border-slate-200 flex-grow" style="min-height: 240px;">
+                        <canvas id="graphCanvas"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- 하단 섹션: 중1 과학 교과 핵심 정리 & 미니 확인 퀴즈 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-8">
+            
+            <!-- 교과 핵심 정리 카드 (6칸) -->
+            <div class="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                        <i data-lucide="book-open" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-lg font-black text-slate-800">중1 과학 교과서 핵심 정리</h3>
+                </div>
+
+                <div class="space-y-3 text-sm text-slate-700 leading-relaxed">
+                    <div class="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-100">
+                        <p class="font-bold text-indigo-900 mb-1">1. 샤를 법칙이란?</p>
+                        <p>
+                            압력이 일정할 때, 일정량의 기체의 부피는 온도가 <strong>1°C 올라갈 때마다 0°C 때 부피의 $\frac{1}{273}$씩 증가</strong>합니다.
+                        </p>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                        <p class="font-bold text-emerald-900 mb-1">2. 입자 운동으로 이해하는 원리</p>
+                        <ul class="list-disc list-inside space-y-1 text-slate-700">
+                            <li><strong>온도가 높아질 때:</strong> 기체 입자의 운동이 빨라져 피스톤과 용기 벽면에 충돌하는 횟수와 세기가 커집니다. → 내부 압력이 커져 피스톤을 위로 밀어 올리므로 <strong>부피가 증가</strong>합니다.</li>
+                            <li><strong>온도가 낮아질 때:</strong> 기체 입자의 운동이 느려져 충돌 횟수와 세기가 줄어듭니다. → 외부 압력에 의해 피스톤이 아래로 내려가므로 <strong>부피가 감소</strong>합니다.</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                        <p class="font-bold text-slate-800 mb-1">3. 우리 주변의 샤를 법칙 현상</p>
+                        <p class="text-xs sm:text-sm text-slate-600">
+                            • 찌그러진 탁구공을 뜨거운 물에 넣으면 다시 펴진다.<br>
+                            • 열기구 속 공기를 가열하면 공기의 부피가 커져 하늘로 떠오른다.<br>
+                            • 여름철 과자 봉지가 겨울철보다 더 빵빵하게 부풀어 오른다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 확인 퀴즈 영역 (6칸) -->
+            <div class="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                                <i data-lucide="help-circle" class="w-5 h-5"></i>
+                            </div>
+                            <h3 class="text-lg font-black text-slate-800">개념 확인 퀴즈</h3>
+                        </div>
+                        <span id="quiz-progress" class="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                            문제 1 / 3
+                        </span>
+                    </div>
+
+                    <!-- 퀴즈 문제 텍스트 -->
+                    <div id="quiz-container" class="space-y-4">
+                        <p id="quiz-question" class="text-base font-bold text-slate-800 leading-snug">
+                            Q1. 압력이 일정할 때, 0°C에서 부피가 273 mL인 기체의 온도를 27°C로 높이면 부피는 몇 mL가 될까요?
+                        </p>
+
+                        <!-- 보기 버튼들 -->
+                        <div id="quiz-options" class="space-y-2.5">
+                            <!-- JS로 동적 생성 -->
+                        </div>
+
+                        <!-- 정답 해설 피드백 박스 -->
+                        <div id="quiz-feedback" class="hidden p-3.5 rounded-xl text-sm leading-relaxed"></div>
+                    </div>
+                </div>
+
+                <!-- 다음 문제 버튼 -->
+                <div class="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+                    <button id="btn-next-quiz" class="hidden inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-sm">
+                        <span>다음 문제</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        // Lucide 아이콘 초기화
+        lucide.createIcons();
+
+        /**
+         * ============================================================================
+         * 1. 시뮬레이션 상태(State) 관리
+         * ============================================================================
+         */
+        const state = {
+            temperature: 0,         // 섭씨 온도 (°C), 범위: -50 ~ 150
+            v0: 273,                // 0°C일 때 기체의 초기 부피 (mL)
+            isRunning: true,        // 애니메이션 재생 여부
+            showExtrapolation: false, // -273°C 절대영도 점선 외삽 표시 여부
+            particleCount: 28,      // 기체 입자 수 (고정)
+            particles: [],          // 입자 객체 배열
+            pistonY: 0,             // 현재 피스톤의 Y 좌표 (캔버스 픽셀)
+            targetPistonY: 0,       // 목표 피스톤 Y 좌표 (부드러운 이동용)
+            time: 0                 // 불꽃 애니메이션용 시간 변수
+        };
+
+        // 현재 부피 계산 함수: V = V0 + V0 * (t / 273)
+        function getCurrentVolume(temp = state.temperature, v0 = state.v0) {
+            return v0 * (1 + temp / 273);
+        }
+
+        /**
+         * ============================================================================
+         * 2. DOM 요소 참조
+         * ============================================================================
+         */
+        const simCanvas = document.getElementById('simCanvas');
+        const simCtx = simCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        const tempSlider = document.getElementById('temp-slider');
+        const btnTempDown = document.getElementById('btn-temp-down');
+        const btnTempUp = document.getElementById('btn-temp-up');
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const btnToggleExtrapolate = document.getElementById('btn-toggle-extrapolate');
+        const v0Buttons = document.querySelectorAll('.v0-btn');
+
+        // 대시보드 텍스트 요소
+        const statTempC = document.getElementById('stat-temp-c');
+        const statTempK = document.getElementById('stat-temp-k');
+        const statVolume = document.getElementById('stat-volume');
+        const statSpeedBadge = document.getElementById('stat-speed-badge');
+        const tempIconBg = document.getElementById('temp-icon-bg');
+        const formulaDisplay = document.getElementById('formula-display');
+        const simCaption = document.getElementById('sim-caption');
+
+        /**
+         * ============================================================================
+         * 3. 캔버스 해상도(DPR) 및 반응형 크기 조정
+         * ============================================================================
+         */
+        function resizeCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+
+            // 시뮬레이션 캔버스
+            const simRect = simCanvas.parentElement.getBoundingClientRect();
+            simCanvas.width = simRect.width * dpr;
+            simCanvas.height = simRect.height * dpr;
+            simCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // 그래프 캔버스
+            const graphRect = graphCanvas.parentElement.getBoundingClientRect();
+            graphCanvas.width = graphRect.width * dpr;
+            graphCanvas.height = graphRect.height * dpr;
+            graphCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // 리사이즈 시 입자 위치 안전하게 재배치
+            clampParticlesToCylinder();
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+
+        /**
+         * ============================================================================
+         * 4. 기체 입자(Particle) 초기화 및 물리 업데이트
+         * ============================================================================
+         */
+        function getCylinderMetrics() {
+            const width = simCanvas.clientWidth;
+            const height = simCanvas.clientHeight;
+
+            const cylWidth = Math.min(200, width * 0.52);
+            const cylX = (width - cylWidth) / 2;
+            const cylBottom = height - 88; // 하단 가열/냉각 장치 공간 확보
+            const cylTop = 36;
+            const maxInteriorHeight = cylBottom - cylTop;
+
+            // 부피 비율 계산 (최대 부피 기준: temp=150일 때 비율은 1 + 150/273 ≈ 1.55)
+            // 시각적으로 여유 있게 표시하기 위해 maxRatio = 1.75로 설정
+            const volumeRatio = (1 + state.temperature / 273) / 1.75;
+            const currentGasHeight = Math.max(35, maxInteriorHeight * volumeRatio);
+            const targetPistonY = cylBottom - currentGasHeight;
+
+            return {
+                width,
+                height,
+                cylX,
+                cylWidth,
+                cylTop,
+                cylBottom,
+                maxInteriorHeight,
+                targetPistonY
+            };
+        }
+
+        function initParticles() {
+            state.particles = [];
+            const m = getCylinderMetrics();
+            state.pistonY = m.targetPistonY;
+
+            for (let i = 0; i < state.particleCount; i++) {
+                const radius = 6;
+                const x = m.cylX + radius + 4 + Math.random() * (m.cylWidth - radius * 2 - 8);
+                const y = state.pistonY + radius + 16 + Math.random() * (m.cylBottom - state.pistonY - radius * 2 - 20);
+                const angle = Math.random() * Math.PI * 2;
+                state.particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle),
+                    vy: Math.sin(angle),
+                    radius
+                });
+            }
+        }
+
+        function clampParticlesToCylinder() {
+            const m = getCylinderMetrics();
+            state.pistonY = m.targetPistonY;
+            const pistonBottom = state.pistonY + 14;
+
+            state.particles.forEach(p => {
+                if (p.x - p.radius < m.cylX + 3) p.x = m.cylX + p.radius + 3;
+                if (p.x + p.radius > m.cylX + m.cylWidth - 3) p.x = m.cylX + m.cylWidth - p.radius - 3;
+                if (p.y - p.radius < pistonBottom + 2) p.y = pistonBottom + p.radius + 2;
+                if (p.y + p.radius > m.cylBottom - 3) p.y = m.cylBottom - p.radius - 3;
+            });
+        }
+
+        // 온도에 따른 입자 속도 배율 (절대온도 제곱근에 비례하도록 자연스럽게 설정)
+        function getSpeedMultiplier() {
+            const kelvin = state.temperature + 273;
+            // 0°C(273K)일 때 기준 속도 = 2.6
+            return 2.6 * Math.sqrt(kelvin / 273);
+        }
+
+        // 온도에 따른 입자 색상 반환 (파란색 -> 보라/초록 -> 주황/빨간색)
+        function getParticleColor() {
+            const t = state.temperature;
+            if (t < 0) {
+                // -50 ~ 0: 진한 파랑 -> 밝은 파랑
+                const ratio = (t + 50) / 50;
+                const r = Math.round(30 + ratio * 30);
+                const g = Math.round(100 + ratio * 60);
+                const b = 245;
+                return `rgb(${r}, ${g}, ${b})`;
+            } else if (t <= 60) {
+                // 0 ~ 60: 파랑 -> 주황
+                const ratio = t / 60;
+                const r = Math.round(59 + ratio * 185);
+                const g = Math.round(130 - ratio * 25);
+                const b = Math.round(246 - ratio * 210);
+                return `rgb(${r}, ${g}, ${b})`;
+            } else {
+                // 60 ~ 150: 주황 -> 강렬한 빨강
+                const ratio = (t - 60) / 90;
+                const r = Math.round(244 - ratio * 15);
+                const g = Math.round(105 - ratio * 75);
+                const b = Math.round(36 - ratio * 15);
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+        }
+
+        function updateSimulation() {
+            const m = getCylinderMetrics();
+            // 피스톤이 목표 높이로 부드럽게 이동
+            state.pistonY += (m.targetPistonY - state.pistonY) * 0.12;
+
+            if (!state.isRunning) return;
+
+            state.time += 0.08;
+            const speed = getSpeedMultiplier();
+            const pistonBottom = state.pistonY + 14; // 피스톤 두께 14px
+
+            for (let i = 0; i < state.particles.length; i++) {
+                const p = state.particles[i];
+
+                // 정규화된 방향 벡터에 현재 온도의 속도 적용
+                const mag = Math.hypot(p.vx, p.vy) || 1;
+                p.vx = (p.vx / mag) * speed;
+                p.vy = (p.vy / mag) * speed;
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // 좌우 실린더 벽면 충돌
+                if (p.x - p.radius < m.cylX + 3) {
+                    p.x = m.cylX + 3 + p.radius;
+                    p.vx *= -1;
+                } else if (p.x + p.radius > m.cylX + m.cylWidth - 3) {
+                    p.x = m.cylX + m.cylWidth - 3 - p.radius;
+                    p.vx *= -1;
+                }
+
+                // 상단 피스톤 밑면 충돌
+                if (p.y - p.radius < pistonBottom) {
+                    p.y = pistonBottom + p.radius;
+                    p.vy = Math.abs(p.vy);
+                }
+
+                // 하단 실린더 바닥 충돌
+                if (p.y + p.radius > m.cylBottom - 3) {
+                    p.y = m.cylBottom - 3 - p.radius;
+                    p.vy = -Math.abs(p.vy);
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 5. 실린더 & 피스톤 & 가열/냉각 장치 그리기
+         * ============================================================================
+         */
+        function drawSimulation() {
+            const m = getCylinderMetrics();
+            simCtx.clearRect(0, 0, m.width, m.height);
+
+            const pistonBottom = state.pistonY + 14;
+
+            // 1) 기체 내부 배경 은은한 온도 색조
+            const bgAlpha = Math.min(0.16, Math.abs(state.temperature) / 900 + 0.04);
+            simCtx.fillStyle = state.temperature >= 0
+                ? `rgba(239, 68, 68, ${bgAlpha})`
+                : `rgba(59, 130, 246, ${bgAlpha + 0.05})`;
+            simCtx.fillRect(m.cylX + 2, pistonBottom, m.cylWidth - 4, m.cylBottom - pistonBottom - 2);
+
+            // 2) 외부 대기압 화살표 표시 (일정한 압력 시각화)
+            simCtx.save();
+            simCtx.strokeStyle = '#64748b';
+            simCtx.fillStyle = '#64748b';
+            simCtx.lineWidth = 1.5;
+            const arrowPositions = [m.cylX + m.cylWidth * 0.25, m.cylX + m.cylWidth * 0.75];
+            arrowPositions.forEach(ax => {
+                const ayTop = Math.max(8, state.pistonY - 26);
+                const ayBot = state.pistonY - 4;
+                if (ayBot - ayTop > 10) {
+                    simCtx.beginPath();
+                    simCtx.moveTo(ax, ayTop);
+                    simCtx.lineTo(ax, ayBot);
+                    simCtx.stroke();
+
+                    // 화살촉
+                    simCtx.beginPath();
+                    simCtx.moveTo(ax, ayBot);
+                    simCtx.lineTo(ax - 4, ayBot - 6);
+                    simCtx.lineTo(ax + 4, ayBot - 6);
+                    simCtx.closePath();
+                    simCtx.fill();
+                }
+            });
+            simCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            simCtx.textAlign = 'center';
+            if (state.pistonY > 34) {
+                simCtx.fillText('외부 압력 (1기압 일정)', m.cylX + m.cylWidth / 2, Math.max(14, state.pistonY - 30));
+            }
+            simCtx.restore();
+
+            // 3) 피스톤 및 중앙 추(무게) 그리기
+            // 피스톤 판
+            const pistonGrad = simCtx.createLinearGradient(m.cylX, state.pistonY, m.cylX, pistonBottom);
+            pistonGrad.addColorStop(0, '#475569');
+            pistonGrad.addColorStop(0.5, '#94a3b8');
+            pistonGrad.addColorStop(1, '#334155');
+            simCtx.fillStyle = pistonGrad;
+            simCtx.fillRect(m.cylX + 2, state.pistonY, m.cylWidth - 4, 14);
+
+            // 피스톤 손잡이(로드)
+            simCtx.fillStyle = '#64748b';
+            simCtx.fillRect(m.cylX + m.cylWidth / 2 - 5, Math.max(4, state.pistonY - 22), 10, Math.min(22, state.pistonY));
+
+            // 4) 기체 입자 그리기
+            const particleColor = getParticleColor();
+            state.particles.forEach(p => {
+                simCtx.beginPath();
+                simCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                simCtx.fillStyle = particleColor;
+                simCtx.fill();
+
+                // 입자 광택 효과
+                simCtx.beginPath();
+                simCtx.arc(p.x - p.radius * 0.3, p.y - p.radius * 0.3, p.radius * 0.32, 0, Math.PI * 2);
+                simCtx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+                simCtx.fill();
+            });
+
+            // 5) 유리 실린더 외벽 & 부피 눈금 그리기
+            simCtx.strokeStyle = '#334155';
+            simCtx.lineWidth = 3.5;
+            simCtx.beginPath();
+            simCtx.moveTo(m.cylX, m.cylTop);
+            simCtx.lineTo(m.cylX, m.cylBottom);
+            simCtx.lineTo(m.cylX + m.cylWidth, m.cylBottom);
+            simCtx.lineTo(m.cylX + m.cylWidth, m.cylTop);
+            simCtx.stroke();
+
+            // 눈금 표시 (우측 바깥쪽)
+            simCtx.strokeStyle = '#64748b';
+            simCtx.fillStyle = '#475569';
+            simCtx.lineWidth = 1.2;
+            simCtx.font = '11px "Noto Sans KR", sans-serif';
+            simCtx.textAlign = 'left';
+
+            const numTicks = 8;
+            for (let i = 1; i <= numTicks; i++) {
+                const ratio = i / numTicks;
+                const tickY = m.cylBottom - m.maxInteriorHeight * ratio;
+                const tickLen = (i % 2 === 0) ? 10 : 6;
+
+                simCtx.beginPath();
+                simCtx.moveTo(m.cylX + m.cylWidth, tickY);
+                simCtx.lineTo(m.cylX + m.cylWidth + tickLen, tickY);
+                simCtx.stroke();
+
+                if (i % 2 === 0) {
+                    const volValue = Math.round(state.v0 * 1.75 * ratio);
+                    simCtx.fillText(`${volValue} mL`, m.cylX + m.cylWidth + 14, tickY + 4);
+                }
+            }
+
+            // 현재 피스톤 위치 부피 화살표 라벨 (좌측 바깥쪽)
+            const currentVol = getCurrentVolume().toFixed(1);
+            simCtx.fillStyle = '#059669';
+            simCtx.font = 'bold 12px "Noto Sans KR", sans-serif';
+            simCtx.textAlign = 'right';
+            simCtx.fillText(`${currentVol} mL ▶`, m.cylX - 8, pistonBottom + 4);
+
+            // 6) 하단 가열 / 냉각 장치 그리기
+            drawHeaterOrCooler(m);
+        }
+
+        function drawHeaterOrCooler(m) {
+            const centerX = m.cylX + m.cylWidth / 2;
+            const baseBottom = m.height - 10;
+
+            // 받침대
+            simCtx.fillStyle = '#cbd5e1';
+            simCtx.fillRect(m.cylX - 10, m.cylBottom + 2, m.cylWidth + 20, 6);
+
+            if (state.temperature > 0) {
+                // 가열 장치: 알코올 램프 / 버너 불꽃
+                const intensity = Math.min(1, state.temperature / 150); // 0 ~ 1
+                const flameHeight = 18 + intensity * 34 + Math.sin(state.time * 2.5) * 3;
+                const flameWidth = 14 + intensity * 18;
+
+                // 버너 본체
+                simCtx.fillStyle = '#475569';
+                simCtx.beginPath();
+                simCtx.roundRect(centerX - 24, baseBottom - 16, 48, 16, 4);
+                simCtx.fill();
+
+                // 바깥쪽 주황/빨강 불꽃
+                const flameBaseY = baseBottom - 16;
+                simCtx.beginPath();
+                simCtx.moveTo(centerX - flameWidth, flameBaseY);
+                simCtx.quadraticCurveTo(centerX - flameWidth * 0.8, flameBaseY - flameHeight * 0.6, centerX, flameBaseY - flameHeight);
+                simCtx.quadraticCurveTo(centerX + flameWidth * 0.8, flameBaseY - flameHeight * 0.6, centerX + flameWidth, flameBaseY);
+                simCtx.closePath();
+                simCtx.fillStyle = state.temperature > 80 ? '#ef4444' : '#f97316';
+                simCtx.fill();
+
+                // 안쪽 노란 불꽃
+                simCtx.beginPath();
+                simCtx.moveTo(centerX - flameWidth * 0.5, flameBaseY);
+                simCtx.quadraticCurveTo(centerX, flameBaseY - flameHeight * 0.7, centerX + flameWidth * 0.5, flameBaseY);
+                simCtx.closePath();
+                simCtx.fillStyle = '#fde047';
+                simCtx.fill();
+
+                simCtx.fillStyle = '#dc2626';
+                simCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+                simCtx.textAlign = 'left';
+                simCtx.fillText('🔥 가열 중', centerX + 32, baseBottom - 4);
+
+            } else if (state.temperature < 0) {
+                // 냉각 장치: 얼음 조각들
+                const iceCount = Math.ceil(Math.abs(state.temperature) / 15); // 1 ~ 4개
+                const iceWidth = 26;
+                const startX = centerX - (iceCount * (iceWidth + 4)) / 2;
+
+                for (let i = 0; i < iceCount; i++) {
+                    const ix = startX + i * (iceWidth + 4);
+                    const iy = baseBottom - 26;
+                    simCtx.fillStyle = '#bae6fd';
+                    simCtx.strokeStyle = '#38bdf8';
+                    simCtx.lineWidth = 1.5;
+                    simCtx.beginPath();
+                    simCtx.roundRect(ix, iy, iceWidth, 24, 5);
+                    simCtx.fill();
+                    simCtx.stroke();
+
+                    // 얼음 사선 무늬
+                    simCtx.beginPath();
+                    simCtx.moveTo(ix + 5, iy + 16);
+                    simCtx.lineTo(ix + 14, iy + 6);
+                    simCtx.stroke();
+                }
+
+                simCtx.fillStyle = '#0284c7';
+                simCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+                simCtx.textAlign = 'left';
+                simCtx.fillText('❄️ 냉각 중', centerX + 64, baseBottom - 8);
+
+            } else {
+                // 0°C 기준 상태
+                simCtx.fillStyle = '#64748b';
+                simCtx.font = '11px "Noto Sans KR", sans-serif';
+                simCtx.textAlign = 'center';
+                simCtx.fillText('기준 상태 (0°C 얼음물 중탕 기준)', centerX, baseBottom - 12);
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 6. 실시간 온도-부피 그래프 그리기
+         * ============================================================================
+         */
+        function drawGraph() {
+            const width = graphCanvas.clientWidth;
+            const height = graphCanvas.clientHeight;
+            graphCtx.clearRect(0, 0, width, height);
+
+            // 여백 설정
+            const padLeft = 58;
+            const padRight = 26;
+            const padTop = 22;
+            const padBottom = 38;
+
+            const plotW = width - padLeft - padRight;
+            const plotH = height - padTop - padBottom;
+
+            // X축 범위 결정: 외삽 보기 모드면 -300°C ~ 160°C, 일반 모드면 -60°C ~ 160°C
+            const minTemp = state.showExtrapolation ? -300 : -60;
+            const maxTemp = 160;
+
+            // Y축 범위 결정: 0 mL ~ V0 * 1.7
+            const minVol = 0;
+            const maxVol = state.v0 * 1.7;
+
+            const mapX = (t) => padLeft + ((t - minTemp) / (maxTemp - minTemp)) * plotW;
+            const mapY = (v) => padTop + plotH - ((v - minVol) / (maxVol - minVol)) * plotH;
+
+            // 1) 격자(Grid) 및 축 그리기
+            graphCtx.strokeStyle = '#e2e8f0';
+            graphCtx.lineWidth = 1;
+            graphCtx.font = '11px "Noto Sans KR", sans-serif';
+            graphCtx.fillStyle = '#64748b';
+
+            // Y축 눈금 (부피)
+            const ySteps = 4;
+            graphCtx.textAlign = 'right';
+            for (let i = 0; i <= ySteps; i++) {
+                const v = (maxVol / ySteps) * i;
+                const y = mapY(v);
+                graphCtx.beginPath();
+                graphCtx.moveTo(padLeft, y);
+                graphCtx.lineTo(width - padRight, y);
+                graphCtx.stroke();
+
+                graphCtx.fillText(`${Math.round(v)}`, padLeft - 8, y + 4);
+            }
+
+            // X축 눈금 (온도)
+            const xStep = state.showExtrapolation ? 100 : 50;
+            const firstTick = Math.ceil(minTemp / xStep) * xStep;
+            graphCtx.textAlign = 'center';
+            for (let t = firstTick; t <= maxTemp; t += xStep) {
+                const x = mapX(t);
+                graphCtx.beginPath();
+                graphCtx.moveTo(x, padTop);
+                graphCtx.lineTo(x, padTop + plotH);
+                graphCtx.stroke();
+
+                graphCtx.fillText(`${t}°C`, x, padTop + plotH + 16);
+            }
+
+            // 0°C 기준 세로선 강조
+            const zeroX = mapX(0);
+            graphCtx.strokeStyle = '#94a3b8';
+            graphCtx.lineWidth = 1.5;
+            graphCtx.beginPath();
+            graphCtx.moveTo(zeroX, padTop);
+            graphCtx.lineTo(zeroX, padTop + plotH);
+            graphCtx.stroke();
+
+            // X축, Y축 테두리 선
+            graphCtx.strokeStyle = '#334155';
+            graphCtx.lineWidth = 1.8;
+            graphCtx.beginPath();
+            graphCtx.moveTo(padLeft, padTop);
+            graphCtx.lineTo(padLeft, padTop + plotH);
+            graphCtx.lineTo(width - padRight, padTop + plotH);
+            graphCtx.stroke();
+
+            // 축 제목
+            graphCtx.fillStyle = '#334155';
+            graphCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            graphCtx.textAlign = 'right';
+            graphCtx.fillText('온도 (°C)', width - padRight, padTop + plotH + 31);
+            graphCtx.textAlign = 'left';
+            graphCtx.fillText('부피 (mL)', 8, padTop - 6);
+
+            // 2) 외삽 점선 (-273°C ~ -50°C 구간)
+            if (state.showExtrapolation) {
+                const absZeroX = mapX(-273);
+                const absZeroY = mapY(0);
+                const expStartX = mapX(-50);
+                const expStartY = mapY(getCurrentVolume(-50));
+
+                graphCtx.save();
+                graphCtx.setLineDash([5, 5]);
+                graphCtx.strokeStyle = '#f43f5e';
+                graphCtx.lineWidth = 2;
+                graphCtx.beginPath();
+                graphCtx.moveTo(absZeroX, absZeroY);
+                graphCtx.lineTo(expStartX, expStartY);
+                graphCtx.stroke();
+                graphCtx.restore();
+
+                // -273°C 절대 영도 점 및 라벨
+                graphCtx.fillStyle = '#e11d48';
+                graphCtx.beginPath();
+                graphCtx.arc(absZeroX, absZeroY, 4.5, 0, Math.PI * 2);
+                graphCtx.fill();
+
+                graphCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+                graphCtx.textAlign = 'left';
+                graphCtx.fillText('-273°C (이론상 부피 0)', absZeroX + 6, absZeroY - 8);
+            }
+
+            // 3) 실험 가능 구간 (-50°C ~ 150°C) 실선 그래프
+            const startX = mapX(-50);
+            const startY = mapY(getCurrentVolume(-50));
+            const endX = mapX(150);
+            const endY = mapY(getCurrentVolume(150));
+
+            graphCtx.strokeStyle = '#10b981';
+            graphCtx.lineWidth = 3;
+            graphCtx.beginPath();
+            graphCtx.moveTo(startX, startY);
+            graphCtx.lineTo(endX, endY);
+            graphCtx.stroke();
+
+            // 0°C 기준점(V0) 표시
+            const v0X = mapX(0);
+            const v0Y = mapY(state.v0);
+            graphCtx.fillStyle = '#6366f1';
+            graphCtx.beginPath();
+            graphCtx.arc(v0X, v0Y, 4, 0, Math.PI * 2);
+            graphCtx.fill();
+            graphCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            graphCtx.textAlign = 'right';
+            graphCtx.fillText(`V₀ (${state.v0}mL)`, v0X - 7, v0Y - 6);
+
+            // 4) 현재 온도/부피 좌표 점 및 점선 가이드
+            const curVol = getCurrentVolume();
+            const curX = mapX(state.temperature);
+            const curY = mapY(curVol);
+
+            graphCtx.save();
+            graphCtx.setLineDash([3, 3]);
+            graphCtx.strokeStyle = '#2563eb';
+            graphCtx.lineWidth = 1.3;
+            // 수직 점선
+            graphCtx.beginPath();
+            graphCtx.moveTo(curX, curY);
+            graphCtx.lineTo(curX, padTop + plotH);
+            graphCtx.stroke();
+            // 수평 점선
+            graphCtx.beginPath();
+            graphCtx.moveTo(padLeft, curY);
+            graphCtx.lineTo(curX, curY);
+            graphCtx.stroke();
+            graphCtx.restore();
+
+            // 현재 위치 강조 원
+            graphCtx.fillStyle = '#2563eb';
+            graphCtx.beginPath();
+            graphCtx.arc(curX, curY, 6.5, 0, Math.PI * 2);
+            graphCtx.fill();
+            graphCtx.strokeStyle = '#ffffff';
+            graphCtx.lineWidth = 2;
+            graphCtx.stroke();
+
+            // 현재 좌표 말풍선 텍스트
+            graphCtx.fillStyle = '#1e3a8a';
+            graphCtx.font = 'bold 12px "Noto Sans KR", sans-serif';
+            graphCtx.textAlign = state.temperature > 90 ? 'right' : 'left';
+            const labelOffsetX = state.temperature > 90 ? -10 : 10;
+            graphCtx.fillText(`(${state.temperature}°C, ${curVol.toFixed(1)}mL)`, curX + labelOffsetX, curY - 10);
+        }
+
+        /**
+         * ============================================================================
+         * 7. UI 텍스트 및 대시보드 업데이트
+         * ============================================================================
+         */
+        function updateUI() {
+            const t = state.temperature;
+            const v0 = state.v0;
+            const curVol = getCurrentVolume(t, v0);
+            const kelvin = t + 273;
+
+            // 온도 표시
+            statTempC.textContent = `${t} °C`;
+            statTempK.textContent = `(${kelvin} K)`;
+
+            if (t > 0) {
+                statTempC.className = 'text-2xl sm:text-3xl font-black text-red-600';
+                tempIconBg.className = 'w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center transition-colors';
+            } else if (t < 0) {
+                statTempC.className = 'text-2xl sm:text-3xl font-black text-blue-600';
+                tempIconBg.className = 'w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center transition-colors';
+            } else {
+                statTempC.className = 'text-2xl sm:text-3xl font-black text-slate-700';
+                tempIconBg.className = 'w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center transition-colors';
+            }
+
+            // 부피 표시
+            statVolume.textContent = curVol.toFixed(1);
+
+            // 입자 운동 속도 상태 뱃지
+            if (t <= -20) {
+                statSpeedBadge.textContent = '매우 느림 (냉각)';
+                statSpeedBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-blue-100 text-blue-800';
+            } else if (t < 0) {
+                statSpeedBadge.textContent = '느림';
+                statSpeedBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-sky-100 text-sky-800';
+            } else if (t === 0) {
+                statSpeedBadge.textContent = '보통 (0°C 기준)';
+                statSpeedBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-slate-100 text-slate-700';
+            } else if (t <= 70) {
+                statSpeedBadge.textContent = '빠름 (활발함)';
+                statSpeedBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-amber-100 text-amber-800';
+            } else {
+                statSpeedBadge.textContent = '매우 빠름 (고온)';
+                statSpeedBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-red-100 text-red-800';
+            }
+
+            // 공식 대입 텍스트 업데이트
+            const sign = t >= 0 ? '+' : '-';
+            const absT = Math.abs(t);
+            formulaDisplay.innerHTML = `V = ${v0} ${sign} ${v0} × (${absT} / 273) = <span class="text-emerald-700">${curVol.toFixed(1)} mL</span>`;
+
+            // 실린더 하단 설명 캡션 업데이트
+            if (t > 0) {
+                simCaption.className = 'mt-3 p-3 rounded-xl bg-red-50/80 border border-red-100 text-xs sm:text-sm text-slate-700 leading-relaxed';
+                simCaption.innerHTML = `온도가 <strong>${t}°C</strong>로 높아져 입자 운동이 활발해졌습니다! 피스톤에 부딪히는 충돌 횟수와 세기가 커져 부피가 <strong>${curVol.toFixed(1)} mL</strong>로 늘어났습니다.`;
+            } else if (t < 0) {
+                simCaption.className = 'mt-3 p-3 rounded-xl bg-blue-50/80 border border-blue-100 text-xs sm:text-sm text-slate-700 leading-relaxed';
+                simCaption.innerHTML = `온도가 <strong>${t}°C</strong>로 낮아져 입자 운동이 둔해졌습니다! 피스톤에 가해지는 충돌 세기가 약해져 부피가 <strong>${curVol.toFixed(1)} mL</strong>로 줄어들었습니다.`;
+            } else {
+                simCaption.className = 'mt-3 p-3 rounded-xl bg-slate-100 border border-slate-200 text-xs sm:text-sm text-slate-700 leading-relaxed';
+                simCaption.innerHTML = `현재 <strong>0°C</strong> 기준 상태입니다. 기체 입자들이 일정한 속도로 움직이며 외부 압력(1기압)과 균형을 이루고 있습니다.`;
+            }
+
+            drawGraph();
+        }
+
+        function setTemperature(newTemp) {
+            state.temperature = Math.max(-50, Math.min(150, Math.round(newTemp)));
+            tempSlider.value = state.temperature;
+            updateUI();
+        }
+
+        /**
+         * ============================================================================
+         * 8. 이벤트 리스너 등록
+         * ============================================================================
+         */
+        tempSlider.addEventListener('input', (e) => {
+            setTemperature(Number(e.target.value));
+        });
+
+        btnTempDown.addEventListener('click', () => {
+            setTemperature(state.temperature - 10);
+        });
+
+        btnTempUp.addEventListener('click', () => {
+            setTemperature(state.temperature + 10);
+        });
+
+        btnPlayPause.addEventListener('click', () => {
+            state.isRunning = !state.isRunning;
+            btnPlayPause.innerHTML = state.isRunning
+                ? `<i data-lucide="pause" class="w-4 h-4"></i><span>일시정지</span>`
+                : `<i data-lucide="play" class="w-4 h-4"></i><span>다시재생</span>`;
+            lucide.createIcons();
+        });
+
+        btnReset.addEventListener('click', () => {
+            state.v0 = 273;
+            updateV0Buttons();
+            setTemperature(0);
+            if (!state.isRunning) {
+                state.isRunning = true;
+                btnPlayPause.innerHTML = `<i data-lucide="pause" class="w-4 h-4"></i><span>일시정지</span>`;
+                lucide.createIcons();
+            }
+        });
+
+        btnToggleExtrapolate.addEventListener('click', () => {
+            state.showExtrapolation = !state.showExtrapolation;
+            if (state.showExtrapolation) {
+                btnToggleExtrapolate.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-300 bg-rose-50 text-rose-700 transition shadow-sm';
+                btnToggleExtrapolate.innerHTML = `<i data-lucide="eye-off" class="w-4 h-4 text-rose-600"></i><span>-273°C 점선 숨기기</span>`;
+            } else {
+                btnToggleExtrapolate.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition shadow-sm';
+                btnToggleExtrapolate.innerHTML = `<i data-lucide="eye" class="w-4 h-4 text-rose-500"></i><span>-273°C (절대영도) 점선 보기</span>`;
+            }
+            lucide.createIcons();
+            drawGraph();
+        });
+
+        function updateV0Buttons() {
+            v0Buttons.forEach(btn => {
+                const val = Number(btn.dataset.v0);
+                if (val === state.v0) {
+                    btn.className = 'v0-btn py-2 px-2 rounded-xl text-xs font-bold border-2 border-indigo-600 bg-indigo-50 text-indigo-700 transition';
+                } else {
+                    btn.className = 'v0-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition';
+                }
+            });
+        }
+
+        v0Buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.v0 = Number(btn.dataset.v0);
+                updateV0Buttons();
+                updateUI();
+            });
+        });
+
+        /**
+         * ============================================================================
+         * 9. 개념 확인 퀴즈 로직
+         * ============================================================================
+         */
+        const quizData = [
+            {
+                question: "Q1. 압력이 일정할 때, 0°C에서 부피가 273 mL인 기체의 온도를 27°C로 높이면 부피는 몇 mL가 될까요?",
+                options: [
+                    "273 mL (변화 없다)",
+                    "290 mL",
+                    "300 mL",
+                    "546 mL"
+                ],
+                answer: 2,
+                explanation: "정답은 300 mL입니다! 0°C 때 부피가 273 mL이면 온도가 1°C 올라갈 때마다 1 mL씩 증가하므로, 27°C에서는 273 + 27 = 300 mL가 됩니다."
+            },
+            {
+                question: "Q2. 기체를 가열하여 온도를 높였을 때 실린더의 피스톤이 위로 올라가는 까닭을 입자 운동으로 바르게 설명한 것은?",
+                options: [
+                    "기체 입자의 크기가 커지기 때문이다.",
+                    "기체 입자의 개수가 늘어나기 때문이다.",
+                    "기체 입자의 운동이 활발해져 피스톤에 충돌하는 횟수와 세기가 커지기 때문이다.",
+                    "기체 입자의 무게가 가벼워져 위로 떠오르기 때문이다."
+                ],
+                answer: 2,
+                explanation: "정답은 3번입니다! 온도가 높아져도 입자의 크기나 개수는 변하지 않으며, 입자의 운동 속도가 빨라져 용기 벽면과 피스톤에 더 자주, 더 세게 충돌하기 때문에 부피가 증가합니다."
+            },
+            {
+                question: "Q3. 다음 중 샤를 법칙과 가장 관련이 깊은 현상은 무엇인가요?",
+                options: [
+                    "하늘 높이 올라간 풍선이 점점 커지다가 터진다.",
+                    "찌그러진 탁구공을 뜨거운 물에 넣으면 다시 둥글게 펴진다.",
+                    "잠수부가 내뿜은 공기 방울이 수면으로 올라올수록 커진다.",
+                    "주사기 입구를 막고 피스톤을 누르면 기체의 부피가 줄어든다."
+                ],
+                answer: 1,
+                explanation: "정답은 2번입니다! 뜨거운 물에 의해 탁구공 내부 공기의 온도가 높아져 부피가 팽창하는 현상(샤를 법칙)입니다. 나머지 1, 3, 4번은 압력 변화에 따른 부피 변화(보일 법칙)입니다."
+            }
+        ];
+
+        let currentQuizIdx = 0;
+        let quizAnswered = false;
+
+        const quizProgress = document.getElementById('quiz-progress');
+        const quizQuestion = document.getElementById('quiz-question');
+        const quizOptions = document.getElementById('quiz-options');
+        const quizFeedback = document.getElementById('quiz-feedback');
+        const btnNextQuiz = document.getElementById('btn-next-quiz');
+
+        function renderQuiz() {
+            quizAnswered = false;
+            const q = quizData[currentQuizIdx];
+            quizProgress.textContent = `문제 ${currentQuizIdx + 1} / ${quizData.length}`;
+            quizQuestion.textContent = q.question;
+            quizFeedback.classList.add('hidden');
+            btnNextQuiz.classList.add('hidden');
+
+            quizOptions.innerHTML = '';
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-indigo-50/70 hover:border-indigo-300 text-sm font-medium text-slate-700 transition flex items-center gap-2.5';
+                btn.innerHTML = `<span class="w-6 h-6 rounded-full bg-white border border-slate-300 text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span><span>${opt}</span>`;
+                btn.addEventListener('click', () => handleQuizAnswer(idx, btn));
+                quizOptions.appendChild(btn);
+            });
+        }
+
+        function handleQuizAnswer(selectedIdx, clickedBtn) {
+            if (quizAnswered) return;
+            quizAnswered = true;
+
+            const q = quizData[currentQuizIdx];
+            const isCorrect = selectedIdx === q.answer;
+            const allBtns = quizOptions.querySelectorAll('button');
+
+            allBtns.forEach((b, idx) => {
+                b.disabled = true;
+                if (idx === q.answer) {
+                    b.className = 'w-full text-left p-3 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-sm font-bold text-emerald-900 flex items-center gap-2.5';
+                } else if (idx === selectedIdx && !isCorrect) {
+                    b.className = 'w-full text-left p-3 rounded-xl border-2 border-rose-400 bg-rose-50 text-sm font-bold text-rose-900 flex items-center gap-2.5';
+                } else {
+                    b.className = 'w-full text-left p-3 rounded-xl border border-slate-200 bg-slate-50 opacity-60 text-sm text-slate-500 flex items-center gap-2.5';
+                }
+            });
+
+            quizFeedback.classList.remove('hidden');
+            if (isCorrect) {
+                quizFeedback.className = 'p-3.5 rounded-xl text-sm leading-relaxed bg-emerald-50 border border-emerald-200 text-emerald-900';
+                quizFeedback.innerHTML = `<strong>🎉 정답입니다!</strong><br>${q.explanation}`;
+            } else {
+                quizFeedback.className = 'p-3.5 rounded-xl text-sm leading-relaxed bg-rose-50 border border-rose-200 text-rose-900';
+                quizFeedback.innerHTML = `<strong>💡 아쉬워요! 다시 확인해 볼까요?</strong><br>${q.explanation}`;
+            }
+
+            btnNextQuiz.classList.remove('hidden');
+            btnNextQuiz.querySelector('span').textContent = (currentQuizIdx < quizData.length - 1) ? '다음 문제' : '처음부터 다시 풀기';
+        }
+
+        btnNextQuiz.addEventListener('click', () => {
+            currentQuizIdx = (currentQuizIdx + 1) % quizData.length;
+            renderQuiz();
+        });
+
+        /**
+         * ============================================================================
+         * 10. 메인 애니메이션 루프 및 초기화
+         * ============================================================================
+         */
+        function animateLoop() {
+            updateSimulation();
+            drawSimulation();
+            requestAnimationFrame(animateLoop);
+        }
+
+        window.onload = function () {
+            resizeCanvases();
+            initParticles();
+            updateUI();
+            renderQuiz();
+            animateLoop();
+        };
+    </script>
+</body>
+</html>
